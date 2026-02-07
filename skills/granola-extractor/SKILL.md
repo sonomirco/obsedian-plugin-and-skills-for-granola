@@ -51,7 +51,7 @@ Match files where the title contains the query string (case-insensitive).
 **If multiple files found:**
 - Use `AskUserQuestion` to present the user with a list of matching meetings
 - Format options to include: meeting title and date
-- Example option label: "Snug interview - 2025-09-03"
+- Example option label: "Q3 planning session - 2025-09-03"
 - Proceed to Step 3 with the selected meeting's `granola_id` and `title`
 
 ### Step 3: Extract and Display Transcript
@@ -96,11 +96,11 @@ If the transcript is unavailable, inform the user that no transcript content was
 
 ## Example Usage
 
-**User**: `/granola-transcript Snug`
+**User**: `/granola-transcript Q3 planning`
 
 **Process**:
 1. Search files in `VAULT_GRANOLA_PATH`
-2. Find match: `2025-09-03_Snug interview.md`
+2. Find match: `2025-09-03_Q3 planning session.md`
 3. Extract `granola_id: 50dc18e1-fd84-459b-9a1d-a7c7d254b800`
 4. Fetch full transcript from Granola cache
 5. Print the transcript in the conversation

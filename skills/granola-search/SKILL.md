@@ -27,11 +27,11 @@ Parse the user's natural language query to identify which terms belong to each f
 
 | Dimension | What matches | Examples |
 |-----------|-------------|----------|
-| **Folder tag** | Person names, project names, categories | "Brady", "AECOM", "QA Drawings", "Data science" |
-| **Title** | Meeting name references, descriptive phrases | "Madrid followup", "automation roadmap" |
-| **Content** | Topics, keywords, technical terms | "Revit", "pilot purgatory", "ROI" |
+| **Folder tag** | Person names, project names, categories | "Alex", "Project Alpha", "Design Reviews", "Data science" |
+| **Title** | Meeting name references, descriptive phrases | "Q3 planning", "automation roadmap" |
+| **Content** | Topics, keywords, technical terms | "budget", "timeline", "ROI" |
 
-When ambiguous, default to folder tag first, then content. A single query may span multiple dimensions. For example, "Brady meetings about automation" means folder: Brady, content: automation.
+When ambiguous, default to folder tag first, then content. A single query may span multiple dimensions. For example, "Alex meetings about automation" means folder: Alex, content: automation.
 
 ## Search Workflow
 
@@ -49,7 +49,7 @@ Use the Grep tool to find files containing the folder tag. Search for the tag as
 
 After collecting matches, read each file's frontmatter to confirm the match is inside the `folders:` block and not in `participants:` or body content. This avoids false positives.
 
-Partial matching is intentional — "Brady" matches the folder "Chat with Brady".
+Partial matching is intentional — "Alex" matches the folder "Chat with Alex".
 
 When the query implies **multiple** folder tags, search for each tag separately and intersect the file lists to keep only files that match **all** tags.
 
@@ -112,37 +112,32 @@ Found N files matching folder: "X", content: "Y"
 
 ## Edge Cases
 
-- **Zero matches at any step**: Report which step produced no results and suggest alternatives. For example: "No files matched folder 'Brady'. Did you mean 'Chat with Brady'? Known folders listed below."
+- **Zero matches at any step**: Report which step produced no results and suggest alternatives. For example: "No files matched folder 'Alex'. Did you mean 'Chat with Alex'? Known folders listed below."
 - **Broad results with more than 15 files**: Summarize distribution by folder or date range, then ask the user to narrow the search.
 - **Case variations**: Always use case-insensitive matching.
 
 ## Known Folder Tags
 
-For reference, these are the current folder tags in the Granola collection:
+Update this list with the folder tags from your own Granola collection. Example tags:
 
-- Aecom / AECOM
-- Augment
-- Chat with Brady
-- Chat with David
+- Chat with Alex
+- Chat with Jordan
+- Project Alpha
+- Design Reviews
 - Data science
-- Digital meeting
-- EC
-- Elevate
-- Garrick mentoring
+- Weekly standup
 - General
-- Interview in AEC
-- QA Drawings
 
 ## Example Usage
 
-**`/granola-search Brady meetings about automation`**
-Step 1: filter to "Chat with Brady" folder. Step 3: search for "automation" in those files.
+**`/granola-search Alex meetings about automation`**
+Step 1: filter to "Chat with Alex" folder. Step 3: search for "automation" in those files.
 
-**`/granola-search search all meetings for Revit`**
-Skip Steps 1 and 2, search all files for "Revit".
+**`/granola-search search all meetings for budget`**
+Skip Steps 1 and 2, search all files for "budget".
 
-**`/granola-search AECOM QA Drawings`**
-Step 1: intersect files matching both "AECOM" and "QA Drawings" folder tags.
+**`/granola-search Project Alpha Design Reviews`**
+Step 1: intersect files matching both "Project Alpha" and "Design Reviews" folder tags.
 
-**`/granola-search what Brady things should be the action to avoid people thinking we are developing AI tools`**
-Step 1: filter to "Chat with Brady" folder. Step 2: search titles for "AI" or "Automation" — if no title matches, fall through. Step 3: search body content for "AI tools", "AI", "automation", "developing" across the Brady files.
+**`/granola-search what did Jordan say about the product launch timeline`**
+Step 1: filter to "Chat with Jordan" folder. Step 2: search titles for "launch" or "timeline" — if no title matches, fall through. Step 3: search body content for "product launch", "timeline", "launch" across the Jordan files.

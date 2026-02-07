@@ -77,11 +77,11 @@ Located in `skills/granola-search`. A Claude Code skill invocable with `/granola
 
 This skill searches through the markdown files created by the Obsidian plugin. It uses a 3-step progressive filtering approach against the synced files' YAML frontmatter and body content:
 
-1. **Folder tags** — filter by person names, projects, or categories (e.g., "Chat with Brady", "AECOM").
+1. **Folder tags** — filter by person names, projects, or categories (e.g., "Chat with Alex", "Project Alpha").
 2. **Title** — narrow by meeting title keywords.
 3. **Body content** — search for topics and keywords in the summary text.
 
-Each step narrows the result set. Steps are skipped when no matching filter is given, and natural language queries like "meetings with Brady about automation" are parsed across all three dimensions.
+Each step narrows the result set. Steps are skipped when no matching filter is given, and natural language queries like "meetings with Alex about automation" are parsed across all three dimensions.
 
 ---
 
