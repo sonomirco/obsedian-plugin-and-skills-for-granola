@@ -1,0 +1,25 @@
+{
+	"name": "obsidian-granola-sync",
+	"version": "1.0.0",
+	"description": "Sync AI summaries from Granola meetings to Obsidian",
+	"main": "main.js",
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "node esbuild.config.mjs production"
+	},
+	"keywords": [
+		"obsidian",
+		"granola",
+		"meeting-notes",
+		"sync"
+	],
+	"author": "Mirco Bianchini",
+	"license": "MIT",
+	"devDependencies": {
+		"@types/node": "^18.0.0",
+		"builtin-modules": "^3.3.0",
+		"esbuild": "0.17.3",
+		"obsidian": "latest",
+		"typescript": "^5.0.0"
+	}
+}

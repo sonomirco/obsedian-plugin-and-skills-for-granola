@@ -1,0 +1,10 @@
+{
+	"id": "granola-sync",
+	"name": "Granola Sync",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Sync AI summaries from Granola meetings to your vault. Auto-syncs on Obsidian start.",
+	"author": "Mirco Bianchini",
+	"authorUrl": "https://github.com/sonomirco",
+	"isDesktopOnly": true
+}
