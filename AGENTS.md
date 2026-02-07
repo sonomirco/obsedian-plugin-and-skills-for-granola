@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - `main.ts` is the Obsidian plugin source; `main.js` is the built bundle referenced by `manifest.json`.
 - `esbuild.config.mjs` contains the build pipeline (bundle entry is `main.ts`, output is `main.js`).
-- `skills/` holds AI skill artifacts, including `skills/granola_extractor/scripts/granola_extractor.py` and skill docs at `skills/**/SKILL.md`.
+- `skills/` holds AI skill artifacts, including `skills/granola-extractor/scripts/granola-extractor.py` and skill docs at `skills/**/SKILL.md`.
 - `package.json` and `tsconfig.json` define Node/TypeScript tooling and compiler settings.
 
 ## Build, Test, and Development Commands
@@ -27,4 +27,4 @@
 
 ## Security & Configuration Notes
 - Avoid committing personal meeting data or extracted transcripts. Skills read from local Granola caches; keep generated notes in user-specific locations outside the repo.
-- The cache path in `main.ts` and `skills/granola_extractor/scripts/granola_extractor.py` uses the macOS default; on Windows, update these paths to match your Granola install location.
+- The cache path in `main.ts` and `skills/granola-extractor/scripts/granola-extractor.py` uses the macOS default; on Windows, update these paths to match your Granola install location.

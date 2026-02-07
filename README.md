@@ -1,15 +1,19 @@
 # Granola Automation Suite
 
-This repository contains a collection of automation tools designed to integrate **[Granola](https://granola.so)** with **Obsidian** and other workflow tools. It bridges the gap between your meeting AI summaries/transcripts and your personal knowledge management system.
+This repository contains an Obsidian plugin and two Claude Code skills that work together to bridge **[Granola](https://granola.so)** meeting data with your personal knowledge management system.
+
+## How It Works
+
+The **Obsidian plugin** syncs Granola's AI summaries into your vault as markdown files with rich YAML frontmatter (`granola_id`, `folders`, `participants`, etc.). These synced files become the foundation for both skills:
+
+- **Granola Search** queries the synced markdown files by folder tags, title, and content.
+- **Granola Transcript** extracts the **full verbatim transcript** from Granola's local cache — content the plugin doesn't sync — and prints it in the conversation.
 
 ## Contents
 
-1.  **[Obsidian Granola Sync Plugin](./main.ts)** (Root directory)
-    *   An Obsidian plugin that automatically syncs AI summaries from Granola meetings into your Obsidian vault.
-2.  **[Article Folder Set Up Skill](./skills/granola_extractor)** (`skills/` directory)
-    *   A custom skill that extracts full transcripts and enhanced notes from Granola's local cache to set up structured folders for writing articles.
-3.  **[Granola Search Skill](./skills/granola-search)** (`skills/` directory)
-    *   A custom skill for searching through Granola meeting notes by folder tags, titles, and content keywords.
+1.  **[Obsidian Granola Sync Plugin](./main.ts)** — syncs AI summaries from Granola into your Obsidian vault.
+2.  **[Granola Search Skill](./skills/granola-search)** (`/granola-search`) — searches the synced meeting files by folder tags, title, and body content. Requires `VAULT_GRANOLA_PATH` to be configured.
+3.  **[Granola Transcript Skill](./skills/granola-extractor)** (`/granola-transcript`) — extracts the full transcript from Granola's cache (which the plugin doesn't sync) and prints it in the conversation. Requires `VAULT_GRANOLA_PATH` to be configured.
 
 ---
 
@@ -23,26 +27,26 @@ This plugin runs within Obsidian to pull your latest meeting summaries.
 - **Rich Metadata**: Populates YAML frontmatter with `granola_id`, deep links (`granola_url`), and participant lists.
 - **Incremental Sync**: Only adds new meetings; avoids duplicates.
 
-### Installation & Development
+### Installation
 
 #### Prerequisites
-- Node.js installed.
-- Obsidian installed.
+- [Node.js](https://nodejs.org/) installed
+- [Obsidian](https://obsidian.md/) installed
+- [Granola](https://granola.so) installed and run at least once (so the local cache exists)
 
-#### Setup
-```bash
-# Install dependencies
-npm install
-
-# Build the plugin
-npm run build
-```
-
-#### Installing into Obsidian
-1.  Run `npm run build`.
-2.  Create a folder named `granola-sync` inside your Obsidian vault's `.obsidian/plugins/` directory.
-3.  Copy `main.js` and `manifest.json` to that folder (include `styles.css` only if you add one).
-4.  Reload Obsidian and enable "Granola Sync" in Community Plugins.
+#### Steps
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/sonomirco/obsedian-plugin-and-skills-for-granola.git
+   cd obsedian-plugin-and-skills-for-granola
+   ```
+2. Install dependencies and build:
+   ```bash
+   npm install && npm run build
+   ```
+3. Create a folder named `granola-sync` inside your Obsidian vault's `.obsidian/plugins/` directory.
+4. Copy `main.js` and `manifest.json` into that folder.
+5. Open Obsidian, go to **Settings > Community Plugins**, and enable **Granola Sync**.
 
 ### Configuration
 In Obsidian Settings > Granola Sync:
@@ -53,49 +57,54 @@ Platform note: the plugin reads Granola's cache from the macOS default path `~/L
 
 ---
 
-## 2. Article Folder Set Up Skill
+## Installing the Claude Code Skills
 
-Located in `skills/granola_extractor`, this tool is designed to be used by an AI agent or as a standalone Python utility to prepare deep-work environments based on meeting content.
+The two skills (`/granola-search` and `/granola-transcript`) are [Claude Code custom skills](https://docs.anthropic.com/en/docs/claude-code/skills). To install them:
 
-### Functionality
-*   **Search**: Finds Granola meetings by partial title match.
-*   **Extraction**: Accesses Granola's local SQLite/JSON cache directly to retrieve the **full verbatim transcript** and **enhanced notes**.
-*   **Structure**: Creates a new folder (e.g., in `wip-articles/`) containing:
-    *   `cleaned-transcription.md`: The AI-polished summary.
-    *   `raw-transcription.md`: The complete transcript with speaker labels.
+1. Copy the `skills/` folder from this repo into your project or working directory.
+2. Open each skill's `SKILL.md` and set `VAULT_GRANOLA_PATH` to the absolute path where the Obsidian plugin writes meeting files (e.g., `/Users/you/your-vault/Granola`).
+3. The skills will be available as `/granola-search` and `/granola-transcript` in Claude Code.
 
-### Usage
-This skill is structured for integration with AI CLI tools (like Gemini CLI or Claude Code).
+The Granola Transcript skill also requires **Python 3.6+** for the extractor script.
 
-#### Standalone Python Usage
-You can utilize the core logic via the `GranolaExtractor` class:
+---
+
+## 2. Granola Search Skill
+
+Located in `skills/granola-search`. A Claude Code skill invocable with `/granola-search`.
+
+**Configuration:** Set `VAULT_GRANOLA_PATH` in the skill's `SKILL.md` to the absolute path where the Obsidian plugin writes meeting files.
+
+This skill searches through the markdown files created by the Obsidian plugin. It uses a 3-step progressive filtering approach against the synced files' YAML frontmatter and body content:
+
+1. **Folder tags** — filter by person names, projects, or categories (e.g., "Chat with Brady", "AECOM").
+2. **Title** — narrow by meeting title keywords.
+3. **Body content** — search for topics and keywords in the summary text.
+
+Each step narrows the result set. Steps are skipped when no matching filter is given, and natural language queries like "meetings with Brady about automation" are parsed across all three dimensions.
+
+---
+
+## 3. Granola Transcript Skill
+
+Located in `skills/granola-extractor`. A Claude Code skill invocable with `/granola-transcript`.
+
+**Configuration:** Set `VAULT_GRANOLA_PATH` in the skill's `SKILL.md` to the absolute path where the Obsidian plugin writes meeting files.
+
+The Obsidian plugin only syncs AI summaries — it does not include the full verbatim transcript. This skill extracts that missing content directly from Granola's local JSON cache (`cache-v3.json`) and displays it in the conversation.
+
+### Workflow
+1. **Search** — finds a meeting by partial title match in the synced markdown files at `VAULT_GRANOLA_PATH`.
+2. **Extract** — reads the `granola_id` from the matched file's frontmatter, then uses the `GranolaExtractor` Python script to pull the full transcript from Granola's cache.
+3. **Display** — prints the complete transcript with speaker labels in the conversation.
+
+### Standalone Python Usage
+The `GranolaExtractor` class can also be used directly:
 
 ```python
-from skills.granola_extractor.scripts.granola_extractor import GranolaExtractor
+from scripts.granola_extractor import GranolaExtractor
 
 extractor = GranolaExtractor()
-# Fetch by ID
-notes = extractor.get_enhanced_notes('your-granola-id')
 transcript = extractor.get_transcript('your-granola-id')
 ```
 
----
-
-## 3. Granola Search Skill
-
-Located in `skills/granola-search`, this skill provides advanced search capabilities across your Granola meeting notes.
-
-### Features
-- **Progressive Filtering**: Searches by folder tags (e.g., person names, projects), then by meeting title, then by summary content.
-- **Natural Language Querying**: Designed to parse queries like "meetings with Brady about automation".
-- **Deep Metadata Search**: Specifically targets YAML frontmatter for precision.
-
-### Usage
-This is a documentation-based skill for AI agents. It defines the workflow for searching the markdown files generated by the Obsidian plugin or Granola export.
-
----
-
-## Skill Documentation References
-
-- [Anthropic Claude Code: Extend Claude with skills](https://code.claude.com/docs/en/skills)
-- [Agent Skills standard (agentskills.io)](https://agentskills.io/home)

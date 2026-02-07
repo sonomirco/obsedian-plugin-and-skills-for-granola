@@ -11,7 +11,15 @@ arguments: query
 
 Search Granola meeting transcript files using a 3-step progressive filtering approach: folder tags, then title, then summary content. Each step narrows the result set. Skip any step where no filter was specified.
 
-All meeting files are markdown with YAML frontmatter located in your Obsidian vault output folder (default `Granola/` inside your vault).
+All meeting files are markdown with YAML frontmatter located in `VAULT_GRANOLA_PATH`.
+
+## Configuration
+
+Set `VAULT_GRANOLA_PATH` to the absolute path of the folder where the Obsidian Granola Sync plugin writes meeting files. For example:
+
+```
+VAULT_GRANOLA_PATH = /Users/you/your-vault/Granola
+```
 
 ## Query Parsing
 
@@ -35,7 +43,7 @@ Run when the query contains a person name, project name, or known folder tag.
 
 Use the Grep tool to find files containing the folder tag. Search for the tag as a literal string within the frontmatter `folders:` section:
 
-- Use the Grep tool with the pattern set to the folder tag name, searching in `/Users/biancopeve/Documents/sonomirco/Granola`
+- Use the Grep tool with the pattern set to the folder tag name, searching in `VAULT_GRANOLA_PATH`
 - Use case-insensitive matching
 - Collect the list of matching file paths
 
