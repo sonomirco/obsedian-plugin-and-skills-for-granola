@@ -104,13 +104,13 @@ var GranolaSyncPlugin = class extends import_obsidian.Plugin {
   // Granola Cache Reading
   // ========================================================================
   getGranolaCachePath() {
-    return path.join(
-      os.homedir(),
-      "Library",
-      "Application Support",
-      "Granola",
-      "cache-v3.json"
-    );
+    const granolaDir = path.join(os.homedir(), "Library", "Application Support", "Granola");
+    const versions = ["cache-v4.json", "cache-v3.json"];
+    for (const v of versions) {
+      const candidate = path.join(granolaDir, v);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return path.join(granolaDir, "cache-v4.json");
   }
   loadGranolaCache() {
     const cachePath = this.getGranolaCachePath();
@@ -130,6 +130,8 @@ var GranolaSyncPlugin = class extends import_obsidian.Plugin {
         if (parsed.state) {
           data = parsed.state;
         }
+      } else if (data.cache && typeof data.cache === "object" && data.cache.state) {
+        data = data.cache.state;
       }
       return data;
     } catch (error) {
@@ -185,21 +187,35 @@ ${"#".repeat(level + 1)} ${text}
   }
   extractAISummary(cache, meetingId) {
     var _a;
+    // v3: documentPanels (AI-generated panel content)
     const panels = (_a = cache.documentPanels) == null ? void 0 : _a[meetingId];
-    if (!panels) {
-      return null;
-    }
-    const summaries = [];
-    for (const panelId in panels) {
-      const panel = panels[panelId];
-      if (panel == null ? void 0 : panel.content) {
-        const text = this.extractTextFromContent(panel.content);
-        if (text) {
-          summaries.push(text);
+    if (panels) {
+      const summaries = [];
+      for (const panelId in panels) {
+        const panel = panels[panelId];
+        if (panel == null ? void 0 : panel.content) {
+          const text = this.extractTextFromContent(panel.content);
+          if (text) {
+            summaries.push(text);
+          }
         }
       }
+      if (summaries.length > 0) return summaries.join("\n\n");
     }
-    return summaries.length > 0 ? summaries.join("\n\n") : null;
+    // v4: AI panels moved to OPFS — fall back to user notes in document
+    const doc = (cache.documents || {})[meetingId];
+    if (doc) {
+      if (doc.notes_markdown && doc.notes_markdown.trim()) return doc.notes_markdown.trim();
+      if (doc.notes_plain && doc.notes_plain.trim()) return doc.notes_plain.trim();
+      if (doc.notes) {
+        const text = this.extractTextFromContent(doc.notes);
+        if (text && text.trim()) return text.trim();
+      }
+      if (doc.overview && doc.overview.trim()) return doc.overview.trim();
+      if (doc.summary && doc.summary.trim()) return doc.summary.trim();
+    }
+    // Return placeholder so the meeting is still synced
+    return "_No notes available — open Granola to generate an AI summary._";
   }
   // ========================================================================
   // Workspace Resolution
@@ -408,9 +424,6 @@ ${"#".repeat(level + 1)} ${text}
         continue;
       }
       const summary = this.extractAISummary(cache, meetingId);
-      if (!summary) {
-        continue;
-      }
       const meetingFolders = this.getMeetingFolders(
         cache,
         meetingId,

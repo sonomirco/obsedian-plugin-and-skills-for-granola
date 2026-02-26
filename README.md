@@ -2,6 +2,25 @@
 
 This repository contains an Obsidian plugin and two Claude Code skills that work together to bridge **[Granola](https://granola.so)** meeting data with your personal knowledge management system.
 
+---
+
+## ⚠️ Granola v4 Update (February 2026)
+
+Granola updated its local cache format from `cache-v3.json` to `cache-v4.json` with significant structural changes. This broke both the plugin and the extractor script. The following fixes have been applied:
+
+| Component | What broke | Fix applied |
+|-----------|-----------|-------------|
+| Obsidian plugin | `getGranolaCachePath()` hardcoded to `cache-v3.json` | Now auto-detects `cache-v4.json` → `cache-v3.json` |
+| Obsidian plugin | `loadGranolaCache()` only handled v3's string-encoded cache | Added v4 branch: `data.cache` is now a plain object with a `state` key |
+| Obsidian plugin | `extractAISummary()` read from `documentPanels` (removed in v4) | Falls back to `notes_markdown` → `notes_plain` → `notes` → placeholder |
+| Obsidian plugin | Meetings with no AI summary were silently skipped | Removed the skip gate — all meetings sync, with a placeholder if no notes exist |
+| Extractor script | `CACHE_PATH` hardcoded to `cache-v3.json` | Auto-detects the latest `cache-v*.json` file |
+| Extractor script | Only handled v3 structure | Added v4 dict structure handling |
+
+**Important cache behaviour:** Granola writes `cache-v4.json` only on app startup — the file is not updated while the app is running. Live meeting data is stored in an encrypted OPFS database. To refresh the cache after a meeting, fully quit Granola (`Cmd+Q` on macOS, not just closing the window) and reopen it.
+
+---
+
 ## How It Works
 
 The **Obsidian plugin** syncs Granola's AI summaries into your vault as markdown files with rich YAML frontmatter (`granola_id`, `folders`, `participants`, etc.). These synced files become the foundation for both skills:
@@ -53,7 +72,7 @@ In Obsidian Settings > Granola Sync:
 *   **Output folder**: Destination for meeting notes (Default: `Granola`).
 *   **Days to sync**: How far back to look for meetings (Default: `365`).
 
-Platform note: the plugin reads Granola's cache from the macOS default path `~/Library/Application Support/Granola/cache-v3.json`. On Windows, update `getGranolaCachePath()` in `main.ts` to match your Granola install location, then rebuild.
+Platform note: the plugin auto-detects the Granola cache at `~/Library/Application Support/Granola/cache-v4.json` (falling back to `cache-v3.json` for older installs). On Windows, update `getGranolaCachePath()` in `main.ts` to match your Granola install location, then rebuild.
 
 ---
 
@@ -91,7 +110,7 @@ Located in `skills/granola-extractor`. A Claude Code skill invocable with `/gran
 
 **Configuration:** Set `VAULT_GRANOLA_PATH` in the skill's `SKILL.md` to the absolute path where the Obsidian plugin writes meeting files.
 
-The Obsidian plugin only syncs AI summaries — it does not include the full verbatim transcript. This skill extracts that missing content directly from Granola's local JSON cache (`cache-v3.json`) and displays it in the conversation.
+The Obsidian plugin only syncs AI summaries — it does not include the full verbatim transcript. This skill extracts that missing content directly from Granola's local cache (auto-detected, supports `cache-v3.json` and `cache-v4.json`) and displays it in the conversation.
 
 ### Workflow
 1. **Search** — finds a meeting by partial title match in the synced markdown files at `VAULT_GRANOLA_PATH`.

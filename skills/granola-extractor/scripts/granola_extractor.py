@@ -14,28 +14,47 @@ from typing import Dict, List, Optional, Any
 class GranolaExtractor:
     """Extract meeting data from Granola's cache file."""
 
-    CACHE_PATH = os.path.expanduser("~/Library/Application Support/Granola/cache-v3.json")
+    CACHE_DIR = os.path.expanduser("~/Library/Application Support/Granola")
+
+    @staticmethod
+    def _find_cache_path() -> str:
+        """Auto-detect the latest Granola cache file (v4, v3, etc.)."""
+        import glob
+        cache_dir = os.path.expanduser("~/Library/Application Support/Granola")
+        candidates = sorted(
+            [c for c in glob.glob(os.path.join(cache_dir, "cache-v*.json"))
+             if not c.endswith(".tmp")],
+            reverse=True
+        )
+        if not candidates:
+            raise FileNotFoundError(
+                f"No Granola cache file found in {cache_dir}. "
+                "Make sure Granola is installed and has been run at least once."
+            )
+        return candidates[0]
 
     def __init__(self):
         """Initialize the extractor and load cache data."""
+        self.cache_path = self._find_cache_path()
         self.cache_data = self._load_cache()
 
     def _load_cache(self) -> Dict[str, Any]:
-        """Load and parse Granola's cache file."""
-        if not os.path.exists(self.CACHE_PATH):
-            raise FileNotFoundError(
-                f"Granola cache file not found at {self.CACHE_PATH}. "
-                "Make sure Granola is installed and has been run at least once."
-            )
-
-        with open(self.CACHE_PATH, 'r', encoding='utf-8') as f:
+        """Load and parse Granola's cache file (supports v3 and v4 structures)."""
+        with open(self.cache_path, 'r', encoding='utf-8') as f:
             raw_data = json.load(f)
 
-        # Handle nested JSON structure
+        # v3: cache is a serialised JSON string
         if 'cache' in raw_data and isinstance(raw_data['cache'], str):
             actual_data = json.loads(raw_data['cache'])
             if 'state' in actual_data:
-                raw_data = actual_data['state']
+                return actual_data['state']
+            return actual_data
+
+        # v4: cache is a nested dict with a state key
+        if 'cache' in raw_data and isinstance(raw_data['cache'], dict):
+            state = raw_data['cache'].get('state', {})
+            if state:
+                return state
 
         return raw_data
 

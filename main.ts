@@ -31,7 +31,7 @@ interface SyncState {
 
 interface GranolaCache {
 	documents: Record<string, GranolaMeeting>;
-	documentPanels: Record<string, Record<string, GranolaPanel>>;
+	documentPanels?: Record<string, Record<string, GranolaPanel>>; // v3 only — absent in v4+
 	documentLists?: Record<string, string[]>; // folder_id -> meeting_ids
 	documentListsMetadata?: Record<string, GranolaFolder>;
 	workspaceData?: {
@@ -63,6 +63,11 @@ interface GranolaMeeting {
 	updated_at: string;
 	deleted_at: string | null;
 	workspace_id: string;
+	notes_markdown?: string; // v4: user notes in markdown
+	notes_plain?: string;    // v4: user notes as plain text
+	notes?: GranolaContent;  // v4: user notes as rich content
+	overview?: string;
+	summary?: string;
 	people?: {
 		creator?: { name?: string; email?: string };
 		attendees?: Array<{ name?: string; email?: string }>;
@@ -183,13 +188,18 @@ export default class GranolaSyncPlugin extends Plugin {
 	// ========================================================================
 
 	getGranolaCachePath(): string {
-		return path.join(
+		const granolaDir = path.join(
 			os.homedir(),
 			"Library",
 			"Application Support",
-			"Granola",
-			"cache-v3.json"
+			"Granola"
 		);
+		// Try newest cache version first for forward compatibility
+		for (const version of ["cache-v4.json", "cache-v3.json"]) {
+			const candidate = path.join(granolaDir, version);
+			if (fs.existsSync(candidate)) return candidate;
+		}
+		return path.join(granolaDir, "cache-v4.json");
 	}
 
 	loadGranolaCache(): GranolaCache | null {
@@ -208,12 +218,15 @@ export default class GranolaSyncPlugin extends Plugin {
 			const rawContent = fs.readFileSync(cachePath, "utf-8");
 			let data = JSON.parse(rawContent);
 
-			// Handle nested JSON structure
+			// v3: cache is a serialised JSON string
 			if (data.cache && typeof data.cache === "string") {
 				const parsed = JSON.parse(data.cache);
 				if (parsed.state) {
 					data = parsed.state;
 				}
+			// v4: cache is a nested object with a state key
+			} else if (data.cache && typeof data.cache === "object" && data.cache.state) {
+				data = data.cache.state;
 			}
 
 			return data as GranolaCache;
@@ -287,24 +300,36 @@ export default class GranolaSyncPlugin extends Plugin {
 	extractAISummary(
 		cache: GranolaCache,
 		meetingId: string
-	): string | null {
+	): string {
+		// v3: AI summaries were stored in documentPanels (removed in v4)
 		const panels = cache.documentPanels?.[meetingId];
-		if (!panels) {
-			return null;
-		}
-
-		const summaries: string[] = [];
-		for (const panelId in panels) {
-			const panel = panels[panelId];
-			if (panel?.content) {
-				const text = this.extractTextFromContent(panel.content);
-				if (text) {
-					summaries.push(text);
+		if (panels) {
+			const summaries: string[] = [];
+			for (const panelId in panels) {
+				const panel = panels[panelId];
+				if (panel?.content) {
+					const text = this.extractTextFromContent(panel.content);
+					if (text) summaries.push(text);
 				}
 			}
+			if (summaries.length > 0) return summaries.join("\n\n");
 		}
 
-		return summaries.length > 0 ? summaries.join("\n\n") : null;
+		// v4: AI panels moved to encrypted OPFS — fall back to user notes
+		const doc = cache.documents?.[meetingId];
+		if (doc) {
+			if (doc.notes_markdown?.trim()) return doc.notes_markdown.trim();
+			if (doc.notes_plain?.trim()) return doc.notes_plain.trim();
+			if (doc.notes) {
+				const text = this.extractTextFromContent(doc.notes);
+				if (text?.trim()) return text.trim();
+			}
+			if (doc.overview?.trim()) return doc.overview.trim();
+			if (doc.summary?.trim()) return doc.summary.trim();
+		}
+
+		// Placeholder so the meeting still syncs even without notes
+		return "_No notes available — open Granola to generate an AI summary._";
 	}
 
 	// ========================================================================
@@ -580,11 +605,8 @@ export default class GranolaSyncPlugin extends Plugin {
 				continue;
 			}
 
-			// Extract AI summary
+			// Extract AI summary (always returns a non-empty string in v4+)
 			const summary = this.extractAISummary(cache, meetingId);
-			if (!summary) {
-				continue;
-			}
 
 			// Get all folder names for this meeting
 			const meetingFolders = this.getMeetingFolders(
