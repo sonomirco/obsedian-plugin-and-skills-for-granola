@@ -6,6 +6,7 @@ import {
 	Setting,
 	TFolder,
 	normalizePath,
+	requestUrl,
 } from "obsidian";
 import * as fs from "fs";
 import * as path from "path";
@@ -333,6 +334,56 @@ export default class GranolaSyncPlugin extends Plugin {
 	}
 
 	// ========================================================================
+	// Granola Cloud API
+	// ========================================================================
+
+	getGranolaAuthToken(): string | null {
+		const tokenPath = path.join(
+			os.homedir(),
+			"Library",
+			"Application Support",
+			"Granola",
+			"supabase.json"
+		);
+		try {
+			const raw = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
+			const workos = JSON.parse(raw.workos_tokens || "{}");
+			if (!workos.access_token || !workos.obtained_at || !workos.expires_in) return null;
+			// Reject if token has less than 5 minutes remaining
+			const ageMs = Date.now() - workos.obtained_at;
+			const expiresMs = workos.expires_in * 1000;
+			if (ageMs >= expiresMs - 5 * 60 * 1000) return null;
+			return workos.access_token as string;
+		} catch {
+			return null;
+		}
+	}
+
+	async fetchDocumentPanelsFromAPI(meetingId: string, token: string): Promise<string | null> {
+		try {
+			const resp = await requestUrl({
+				url: "https://api.granola.ai/v1/get-document-panels",
+				method: "POST",
+				headers: {
+					"Authorization": `Bearer ${token}`,
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({ document_id: meetingId }),
+				throw: false,
+			});
+			if (resp.status !== 200) return null;
+			const panels: Array<{ title: string; content: GranolaContent }> = resp.json;
+			if (!Array.isArray(panels) || panels.length === 0) return null;
+			const texts = panels
+				.map((p) => this.extractTextFromContent(p.content))
+				.filter((t) => t.trim());
+			return texts.length > 0 ? texts.join("\n\n") : null;
+		} catch {
+			return null;
+		}
+	}
+
+	// ========================================================================
 	// Workspace Resolution
 	// ========================================================================
 
@@ -542,6 +593,9 @@ export default class GranolaSyncPlugin extends Plugin {
 		const cutoffDate = new Date();
 		cutoffDate.setDate(cutoffDate.getDate() - this.settings.syncDays);
 
+		// Try to get an auth token for the cloud API (used to fetch AI summaries)
+		const authToken = this.getGranolaAuthToken();
+
 		// Build meeting-to-folders lookup (supports multiple folders per meeting)
 		const meetingToFoldersMap = this.buildMeetingToFoldersMap(cache);
 
@@ -605,8 +659,12 @@ export default class GranolaSyncPlugin extends Plugin {
 				continue;
 			}
 
-			// Extract AI summary (always returns a non-empty string in v4+)
-			const summary = this.extractAISummary(cache, meetingId);
+			// Extract AI summary — try local cache first, then cloud API
+			let summary = this.extractAISummary(cache, meetingId);
+			if (summary.startsWith("_No notes available") && authToken) {
+				const apiSummary = await this.fetchDocumentPanelsFromAPI(meetingId, authToken);
+				if (apiSummary) summary = apiSummary;
+			}
 
 			// Get all folder names for this meeting
 			const meetingFolders = this.getMeetingFolders(

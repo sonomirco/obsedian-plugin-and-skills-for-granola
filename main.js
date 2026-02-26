@@ -104,11 +104,16 @@ var GranolaSyncPlugin = class extends import_obsidian.Plugin {
   // Granola Cache Reading
   // ========================================================================
   getGranolaCachePath() {
-    const granolaDir = path.join(os.homedir(), "Library", "Application Support", "Granola");
-    const versions = ["cache-v4.json", "cache-v3.json"];
-    for (const v of versions) {
-      const candidate = path.join(granolaDir, v);
-      if (fs.existsSync(candidate)) return candidate;
+    const granolaDir = path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "Granola"
+    );
+    for (const version of ["cache-v4.json", "cache-v3.json"]) {
+      const candidate = path.join(granolaDir, version);
+      if (fs.existsSync(candidate))
+        return candidate;
     }
     return path.join(granolaDir, "cache-v4.json");
   }
@@ -186,8 +191,7 @@ ${"#".repeat(level + 1)} ${text}
     return "";
   }
   extractAISummary(cache, meetingId) {
-    var _a;
-    // v3: documentPanels (AI-generated panel content)
+    var _a, _b, _c, _d, _e, _f;
     const panels = (_a = cache.documentPanels) == null ? void 0 : _a[meetingId];
     if (panels) {
       const summaries = [];
@@ -195,27 +199,78 @@ ${"#".repeat(level + 1)} ${text}
         const panel = panels[panelId];
         if (panel == null ? void 0 : panel.content) {
           const text = this.extractTextFromContent(panel.content);
-          if (text) {
+          if (text)
             summaries.push(text);
-          }
         }
       }
-      if (summaries.length > 0) return summaries.join("\n\n");
+      if (summaries.length > 0)
+        return summaries.join("\n\n");
     }
-    // v4: AI panels moved to OPFS — fall back to user notes in document
-    const doc = (cache.documents || {})[meetingId];
+    const doc = (_b = cache.documents) == null ? void 0 : _b[meetingId];
     if (doc) {
-      if (doc.notes_markdown && doc.notes_markdown.trim()) return doc.notes_markdown.trim();
-      if (doc.notes_plain && doc.notes_plain.trim()) return doc.notes_plain.trim();
+      if ((_c = doc.notes_markdown) == null ? void 0 : _c.trim())
+        return doc.notes_markdown.trim();
+      if ((_d = doc.notes_plain) == null ? void 0 : _d.trim())
+        return doc.notes_plain.trim();
       if (doc.notes) {
         const text = this.extractTextFromContent(doc.notes);
-        if (text && text.trim()) return text.trim();
+        if (text == null ? void 0 : text.trim())
+          return text.trim();
       }
-      if (doc.overview && doc.overview.trim()) return doc.overview.trim();
-      if (doc.summary && doc.summary.trim()) return doc.summary.trim();
+      if ((_e = doc.overview) == null ? void 0 : _e.trim())
+        return doc.overview.trim();
+      if ((_f = doc.summary) == null ? void 0 : _f.trim())
+        return doc.summary.trim();
     }
-    // Return placeholder so the meeting is still synced
-    return "_No notes available — open Granola to generate an AI summary._";
+    return "_No notes available \u2014 open Granola to generate an AI summary._";
+  }
+  // ========================================================================
+  // Granola Cloud API
+  // ========================================================================
+  getGranolaAuthToken() {
+    const tokenPath = path.join(
+      os.homedir(),
+      "Library",
+      "Application Support",
+      "Granola",
+      "supabase.json"
+    );
+    try {
+      const raw = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
+      const workos = JSON.parse(raw.workos_tokens || "{}");
+      if (!workos.access_token || !workos.obtained_at || !workos.expires_in)
+        return null;
+      const ageMs = Date.now() - workos.obtained_at;
+      const expiresMs = workos.expires_in * 1e3;
+      if (ageMs >= expiresMs - 5 * 60 * 1e3)
+        return null;
+      return workos.access_token;
+    } catch (e) {
+      return null;
+    }
+  }
+  async fetchDocumentPanelsFromAPI(meetingId, token) {
+    try {
+      const resp = await (0, import_obsidian.requestUrl)({
+        url: "https://api.granola.ai/v1/get-document-panels",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ document_id: meetingId }),
+        throw: false
+      });
+      if (resp.status !== 200)
+        return null;
+      const panels = resp.json;
+      if (!Array.isArray(panels) || panels.length === 0)
+        return null;
+      const texts = panels.map((p) => this.extractTextFromContent(p.content)).filter((t) => t.trim());
+      return texts.length > 0 ? texts.join("\n\n") : null;
+    } catch (e) {
+      return null;
+    }
   }
   // ========================================================================
   // Workspace Resolution
@@ -377,6 +432,7 @@ ${"#".repeat(level + 1)} ${text}
     }
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - this.settings.syncDays);
+    const authToken = this.getGranolaAuthToken();
     const meetingToFoldersMap = this.buildMeetingToFoldersMap(cache);
     const documents = cache.documents || {};
     let syncedCount = 0;
@@ -423,7 +479,12 @@ ${"#".repeat(level + 1)} ${text}
         skippedCount++;
         continue;
       }
-      const summary = this.extractAISummary(cache, meetingId);
+      let summary = this.extractAISummary(cache, meetingId);
+      if (summary.startsWith("_No notes available") && authToken) {
+        const apiSummary = await this.fetchDocumentPanelsFromAPI(meetingId, authToken);
+        if (apiSummary)
+          summary = apiSummary;
+      }
       const meetingFolders = this.getMeetingFolders(
         cache,
         meetingId,

@@ -19,6 +19,8 @@ Granola updated its local cache format from `cache-v3.json` to `cache-v4.json` w
 
 **Important cache behaviour:** Granola writes `cache-v4.json` only on app startup — the file is not updated while the app is running. Live meeting data is stored in an encrypted OPFS database. To refresh the cache after a meeting, fully quit Granola (`Cmd+Q` on macOS, not just closing the window) and reopen it.
 
+**AI summary fetch:** In v4, Granola stores AI-generated summaries in the cloud rather than the local cache. The plugin now calls `https://api.granola.ai/v1/get-document-panels` to fetch the real AI summary whenever the local cache contains no notes. It reads the WorkOS auth token automatically from `~/Library/Application Support/Granola/supabase.json` — no configuration needed. If the token is expired or the API is unreachable, the placeholder text is shown as a fallback.
+
 ---
 
 ## How It Works
